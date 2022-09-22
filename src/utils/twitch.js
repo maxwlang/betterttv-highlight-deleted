@@ -1,6 +1,6 @@
 import $ from 'jquery';
 import cookies from 'cookies-js';
-import twitchAPI from './twitch-api.js';
+import gql from 'graphql-tag';
 import debug from './debug.js';
 import {getCurrentUser, setCurrentUser} from './user.js';
 import {getCurrentChannel, setCurrentChannel} from './channel.js';
@@ -16,9 +16,10 @@ const CHAT_INPUT = 'textarea[data-a-target="chat-input"], div[data-a-target="cha
 const CHAT_WYSIWYG_INPUT_EDITOR = '.chat-wysiwyg-input__editor';
 const COMMUNITY_HIGHLIGHT = '.community-highlight';
 
-const USER_PROFILE_IMAGE_GQL_QUERY = `
-  query GetUserProfilePicture($userId: ID!) {
+const USER_PROFILE_IMAGE_GQL_QUERY = gql`
+  query BTTVGetUserProfilePicture($userId: ID!) {
     user(id: $userId) {
+      id
       profileImageURL(width: 300)
     }
   }
@@ -139,8 +140,7 @@ const profilePicturesByUserId = {};
 const userCookie = cookies.get('twilight-user');
 if (userCookie) {
   try {
-    const {authToken, id, login, displayName} = JSON.parse(userCookie);
-    twitchAPI.setAccessToken(authToken);
+    const {id, login, displayName} = JSON.parse(userCookie);
     setCurrentUser({
       provider: 'twitch',
       id: id.toString(),
@@ -177,7 +177,7 @@ export default {
     }
 
     try {
-      const {data} = await twitchAPI.graphqlQuery(USER_PROFILE_IMAGE_GQL_QUERY, {userId});
+      const {data} = await this.graphqlQuery(USER_PROFILE_IMAGE_GQL_QUERY, {userId});
       profilePicture = data.user.profileImageURL;
     } catch (e) {
       debug.log('failed to fetch twitch user profile', e);
@@ -246,6 +246,19 @@ export default {
     } catch (_) {}
 
     return store;
+  },
+
+  getApolloClient() {
+    let client;
+    try {
+      const node = searchReactChildren(
+        getReactRoot($(REACT_ROOT)[0])._internalRoot.current,
+        (n) => n.pendingProps?.value?.client
+      );
+      client = node.pendingProps.value.client;
+    } catch (_) {}
+
+    return client;
   },
 
   getAutocompleteStateNode() {
@@ -689,5 +702,13 @@ export default {
     } catch (e) {}
 
     return highlight;
+  },
+
+  graphqlQuery(query, variables) {
+    const client = this.getApolloClient();
+    if (client == null) {
+      return Promise.reject(new Error('unable to locate Twitch Apollo client'));
+    }
+    return client.query({query, variables});
   },
 };

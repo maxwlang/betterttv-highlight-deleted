@@ -1,7 +1,7 @@
 import dayjs from 'dayjs';
+import gql from 'graphql-tag';
 import relativeTime from 'dayjs/esm/plugin/relativeTime/index.js';
 import twitch from '../../utils/twitch.js';
-import twitchAPI from '../../utils/twitch-api.js';
 import chat from '../chat/index.js';
 import anonChat from '../anon_chat/index.js';
 import {getCurrentUser} from '../../utils/user.js';
@@ -44,7 +44,7 @@ function secondsToLength(s) {
 
   return `${days > 0 ? `${days} day${days === 1 ? '' : 's'}, ` : ''} ${
     hours > 0 ? `${hours} hour${hours === 1 ? '' : 's'}, ` : ''
-  }  ${minutes > 0 ? `${minutes} minute${minutes === 1 ? '' : 's'}, ` : ''} ${seconds} seconds${
+  }  ${minutes > 0 ? `${minutes} minute${minutes === 1 ? '' : 's'}, ` : ''} ${seconds} second${
     seconds === 1 ? '' : 's'
   }`;
 }
@@ -78,19 +78,21 @@ function massUnban() {
   function getBannedChatters() {
     twitch.sendChatAdminMessage('Fetching banned users...');
 
-    const query = `
-            query Settings_ChannelChat_BannedChatters {
-                currentUser {
-                    bannedUsers {
-                        bannedUser {
-                            login
-                        }
-                    }
-                }
+    const query = gql`
+      query BTTVGetBannedChatters {
+        currentUser {
+          id
+          bannedUsers {
+            bannedUser {
+              id
+              login
             }
-        `;
+          }
+        }
+      }
+    `;
 
-    twitchAPI.graphqlQuery(query).then(
+    twitch.graphqlQuery(query).then(
       ({
         data: {
           currentUser: {bannedUsers},
@@ -202,9 +204,10 @@ function handleCommands(message) {
       break;
 
     case 'chatters': {
-      const query = `
-        query GetChannelChattersCount($name: String!) {
+      const query = gql`
+        query BTTVGetChannelChattersCount($name: String!) {
           channel(name: $name) {
+            id
             chatters {
               count
             }
@@ -212,7 +215,7 @@ function handleCommands(message) {
         }
       `;
 
-      twitchAPI
+      twitch
         .graphqlQuery(query, {name: channel.name})
         .then(
           ({
@@ -229,9 +232,10 @@ function handleCommands(message) {
     case 'followed': {
       const currentUser = getCurrentUser();
       if (!currentUser) break;
-      const query = `
-        query GetFollowingChannel($userId: ID!) {
+      const query = gql`
+        query BTTVGetFollowingChannel($userId: ID!) {
           user(id: $userId) {
+            id
             self {
               follower {
                 followedAt
@@ -241,7 +245,7 @@ function handleCommands(message) {
         }
       `;
 
-      twitchAPI
+      twitch
         .graphqlQuery(query, {userId: channel.id})
         .then(
           ({
@@ -263,9 +267,10 @@ function handleCommands(message) {
       break;
     }
     case 'follows': {
-      const query = `
-        query GetChannelFollowerCount($userId: ID!) {
+      const query = gql`
+        query BTTVGetChannelFollowerCount($userId: ID!) {
           user(id: $userId) {
+            id
             followers(first: 1) {
               totalCount
             }
@@ -273,7 +278,7 @@ function handleCommands(message) {
         }
       `;
 
-      twitchAPI
+      twitch
         .graphqlQuery(query, {userId: channel.id})
         .then(
           ({
@@ -288,17 +293,19 @@ function handleCommands(message) {
       break;
     }
     case 'viewers': {
-      const query = `
-        query GetChannelStreamViewersCount($userId: ID!) {
+      const query = gql`
+        query BTTVGetChannelStreamViewersCount($userId: ID!) {
           user(id: $userId) {
+            id
             stream {
+              id
               viewersCount
             }
           }
         }
       `;
 
-      twitchAPI
+      twitch
         .graphqlQuery(query, {userId: channel.id})
         .then(
           ({
@@ -313,17 +320,19 @@ function handleCommands(message) {
       break;
     }
     case 'uptime': {
-      const query = `
-        query GetChannelStreamCreatedAt($userId: ID!) {
+      const query = gql`
+        query BTTVGetChannelStreamCreatedAt($userId: ID!) {
           user(id: $userId) {
+            id
             stream {
+              id
               createdAt
             }
           }
         }
       `;
 
-      twitchAPI
+      twitch
         .graphqlQuery(query, {userId: channel.id})
         .then(
           ({
